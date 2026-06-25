@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Product } from '../models/Product';
 import { COLORS } from '../utils/constants';
 import { formatDateShort } from '../utils/helpers';
+import ProductImage from './ProductImage';
 
 interface ProductCardProps {
   product: Product;
@@ -27,6 +28,11 @@ const ProductCard: React.FC<ProductCardProps> = ({
       activeOpacity={0.85}
     >
       <View style={styles.header}>
+        <ProductImage
+          imageUri={product.imageUri}
+          category={product.category}
+          size={72}
+        />
         <View style={styles.titleContainer}>
           <Text style={styles.name} numberOfLines={1}>
             {product.productName}
@@ -94,12 +100,12 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: 12,
+    gap: 12,
   },
   titleContainer: {
     flex: 1,
-    marginRight: 12,
   },
   name: {
     fontSize: 17,

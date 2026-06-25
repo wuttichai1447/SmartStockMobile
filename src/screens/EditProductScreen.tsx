@@ -15,10 +15,12 @@ import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import CustomButton from '../components/CustomButton';
+import ProductImagePicker from '../components/ProductImagePicker';
 import { useProducts } from '../context/ProductContext';
 import { ProductsStackParamList } from '../navigation/AppNavigator';
 import { COLORS, PRODUCT_CATEGORIES, PRODUCT_UNITS } from '../utils/constants';
 import { validateProduct } from '../utils/helpers';
+import { getCategoryDefaultImage } from '../utils/productImages';
 
 type RouteProps = RouteProp<ProductsStackParamList, 'EditProduct'>;
 type NavigationProp = NativeStackNavigationProp<ProductsStackParamList, 'EditProduct'>;
@@ -33,6 +35,7 @@ const EditProductScreen: React.FC = () => {
   const [quantity, setQuantity] = useState('0');
   const [barcode, setBarcode] = useState('');
   const [unit, setUnit] = useState(PRODUCT_UNITS[0]);
+  const [imageUri, setImageUri] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -45,6 +48,7 @@ const EditProductScreen: React.FC = () => {
       setQuantity(product.quantity.toString());
       setBarcode(product.barcode);
       setUnit(product.unit);
+      setImageUri(product.imageUri ?? getCategoryDefaultImage(product.category));
     } else {
       Alert.alert('Error', 'Product not found', [
         { text: 'OK', onPress: () => navigation.goBack() },
@@ -77,6 +81,7 @@ const EditProductScreen: React.FC = () => {
         quantity: Number(quantity),
         barcode: barcode.trim(),
         unit,
+        imageUri,
       });
       Alert.alert('Success', 'Product updated successfully', [
         { text: 'OK', onPress: () => navigation.goBack() },
@@ -136,7 +141,10 @@ const EditProductScreen: React.FC = () => {
                 <TouchableOpacity
                   key={item}
                   style={[styles.chip, category === item && styles.chipSelected]}
-                  onPress={() => setCategory(item)}
+                  onPress={() => {
+                    setCategory(item);
+                    setImageUri(getCategoryDefaultImage(item));
+                  }}
                 >
                   <Text
                     style={[
@@ -150,6 +158,15 @@ const EditProductScreen: React.FC = () => {
               ))}
             </View>
           </ScrollView>
+        </View>
+
+        <View style={styles.field}>
+          <Text style={styles.label}>Product Image</Text>
+          <ProductImagePicker
+            category={category}
+            imageUri={imageUri}
+            onChange={setImageUri}
+          />
         </View>
 
         <View style={styles.field}>

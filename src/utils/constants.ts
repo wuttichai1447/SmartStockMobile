@@ -26,24 +26,23 @@ export const DEMO_CREDENTIALS = {
 };
 
 export const PRODUCT_CATEGORIES = [
-  'Electronics',
-  'Food & Beverage',
-  'Clothing',
-  'Hardware',
-  'Office Supplies',
-  'Medical',
-  'Automotive',
-  'Other',
+  'ผลไม้',
+  'ผักสด',
+  'เนื้อสัตว์',
+  'อาหารทะเล',
+  'ธัญพืช',
+  'ของแห้ง',
+  'เครื่องปรุง',
 ];
 
 export const PRODUCT_UNITS = [
-  'pcs',
-  'box',
-  'kg',
-  'liter',
-  'pack',
-  'carton',
-  'set',
+  'กก.',
+  'ขีด',
+  'ลัง',
+  'กระสอบ',
+  'มัด',
+  'ชิ้น',
+  'ถุง',
 ];
 
 export const TRANSACTION_TYPES = {

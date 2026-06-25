@@ -9,9 +9,11 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import CustomButton from '../components/CustomButton';
+import ProductImage from '../components/ProductImage';
 import { useProducts } from '../context/ProductContext';
 import { Product } from '../models/Product';
 import { COLORS } from '../utils/constants';
+import { DEMO_BARCODES } from '../utils/sampleProducts';
 
 const ScannerScreen: React.FC = () => {
   const { findByBarcode, recordStockMovement } = useProducts();
@@ -93,7 +95,7 @@ const ScannerScreen: React.FC = () => {
           <Ionicons name="barcode-outline" size={64} color={COLORS.primary} />
           <Text style={styles.title}>Barcode Lookup</Text>
           <Text style={styles.subtitle}>
-            Web demo uses manual barcode entry. Try SSM10010001, SSM10010002, or SSM10010003.
+            กรอกบาร์โค้ดเพื่อค้นหาสินค้า เช่น {DEMO_BARCODES.slice(0, 3).join(', ')}
           </Text>
 
           <TextInput
@@ -116,8 +118,15 @@ const ScannerScreen: React.FC = () => {
     <View style={styles.container}>
       <View style={styles.productPanel}>
         <View style={styles.productHeader}>
-          <Ionicons name="checkmark-circle" size={32} color={COLORS.success} />
-          <Text style={styles.productTitle}>Product Found</Text>
+          <ProductImage
+            imageUri={product.imageUri}
+            category={product.category}
+            size={96}
+          />
+          <View style={styles.productHeaderText}>
+            <Ionicons name="checkmark-circle" size={28} color={COLORS.success} />
+            <Text style={styles.productTitle}>พบสินค้าแล้ว</Text>
+          </View>
         </View>
 
         <View style={styles.infoCard}>
@@ -216,8 +225,12 @@ const styles = StyleSheet.create({
   productHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 14,
     marginBottom: 20,
+  },
+  productHeaderText: {
+    flex: 1,
+    gap: 4,
   },
   productTitle: {
     fontSize: 22,

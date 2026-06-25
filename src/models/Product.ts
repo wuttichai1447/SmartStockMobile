@@ -5,6 +5,7 @@ export interface Product {
   quantity: number;
   barcode: string;
   unit: string;
+  imageUri?: string | null;
   createdAt: string;
 }
 
@@ -14,6 +15,7 @@ export interface ProductInput {
   quantity: number;
   barcode: string;
   unit: string;
+  imageUri?: string | null;
 }
 
 export type TransactionType = 'IN' | 'OUT';

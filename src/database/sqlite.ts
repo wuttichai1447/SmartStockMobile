@@ -7,6 +7,7 @@ import {
   Transaction,
   TransactionType,
 } from '../models/Product';
+import { MARKET_SAMPLE_PRODUCTS } from '../utils/sampleProducts';
 
 const DATABASE_NAME = 'smart_stock.db';
 
@@ -17,6 +18,24 @@ const getDatabase = (): SQLite.SQLiteDatabase => {
     db = SQLite.openDatabaseSync(DATABASE_NAME);
   }
   return db;
+};
+
+const ensureImageUriColumn = (database: SQLite.SQLiteDatabase): void => {
+  const columns = database.getAllSync<{ name: string }>('PRAGMA table_info(products)');
+  if (!columns.some((column) => column.name === 'imageUri')) {
+    database.execSync('ALTER TABLE products ADD COLUMN imageUri TEXT');
+  }
+};
+
+const resetLegacyDemoData = (database: SQLite.SQLiteDatabase): void => {
+  const legacy = database.getFirstSync<{ count: number }>(
+    `SELECT COUNT(*) as count FROM products WHERE barcode LIKE 'SSM100100%'`
+  );
+
+  if (legacy && legacy.count > 0) {
+    database.execSync('DELETE FROM transactions');
+    database.execSync('DELETE FROM products');
+  }
 };
 
 export const initDatabase = async (): Promise<void> => {
@@ -32,6 +51,7 @@ export const initDatabase = async (): Promise<void> => {
       quantity REAL NOT NULL DEFAULT 0,
       barcode TEXT NOT NULL UNIQUE,
       unit TEXT NOT NULL,
+      imageUri TEXT,
       createdAt TEXT NOT NULL
     );
 
@@ -45,6 +65,9 @@ export const initDatabase = async (): Promise<void> => {
     );
   `);
 
+  ensureImageUriColumn(database);
+  resetLegacyDemoData(database);
+
   const count = database.getFirstSync<{ count: number }>(
     'SELECT COUNT(*) as count FROM products'
   );
@@ -56,55 +79,37 @@ export const initDatabase = async (): Promise<void> => {
 
 const seedSampleData = (database: SQLite.SQLiteDatabase): void => {
   const now = new Date().toISOString();
-  const samples: ProductInput[] = [
-    {
-      productName: 'Wireless Mouse',
-      category: 'Electronics',
-      quantity: 120,
-      barcode: 'SSM10010001',
-      unit: 'pcs',
-    },
-    {
-      productName: 'A4 Copy Paper',
-      category: 'Office Supplies',
-      quantity: 500,
-      barcode: 'SSM10010002',
-      unit: 'pack',
-    },
-    {
-      productName: 'Industrial Gloves',
-      category: 'Hardware',
-      quantity: 75,
-      barcode: 'SSM10010003',
-      unit: 'box',
-    },
-  ];
 
-  for (const sample of samples) {
+  for (const sample of MARKET_SAMPLE_PRODUCTS) {
     database.runSync(
-      `INSERT INTO products (productName, category, quantity, barcode, unit, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO products (productName, category, quantity, barcode, unit, imageUri, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         sample.productName,
         sample.category,
         sample.quantity,
         sample.barcode,
         sample.unit,
+        sample.imageUri ?? null,
         now,
       ]
     );
   }
 
   database.runSync(
-    `INSERT INTO transactions (productId, type, quantity, createdAt) VALUES (1, 'IN', 120, ?)`,
+    `INSERT INTO transactions (productId, type, quantity, createdAt) VALUES (1, 'IN', 45, ?)`,
     [now]
   );
   database.runSync(
-    `INSERT INTO transactions (productId, type, quantity, createdAt) VALUES (2, 'IN', 500, ?)`,
+    `INSERT INTO transactions (productId, type, quantity, createdAt) VALUES (2, 'IN', 28, ?)`,
     [now]
   );
   database.runSync(
-    `INSERT INTO transactions (productId, type, quantity, createdAt) VALUES (3, 'OUT', 25, ?)`,
+    `INSERT INTO transactions (productId, type, quantity, createdAt) VALUES (3, 'OUT', 5, ?)`,
+    [now]
+  );
+  database.runSync(
+    `INSERT INTO transactions (productId, type, quantity, createdAt) VALUES (4, 'IN', 32, ?)`,
     [now]
   );
 };
@@ -149,14 +154,15 @@ export const addProduct = (input: ProductInput): Product => {
   const createdAt = new Date().toISOString();
 
   const result = database.runSync(
-    `INSERT INTO products (productName, category, quantity, barcode, unit, createdAt)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO products (productName, category, quantity, barcode, unit, imageUri, createdAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [
       input.productName,
       input.category,
       input.quantity,
       input.barcode,
       input.unit,
+      input.imageUri ?? null,
       createdAt,
     ]
   );
@@ -181,7 +187,7 @@ export const updateProduct = (
 
   database.runSync(
     `UPDATE products
-     SET productName = ?, category = ?, quantity = ?, barcode = ?, unit = ?
+     SET productName = ?, category = ?, quantity = ?, barcode = ?, unit = ?, imageUri = ?
      WHERE id = ?`,
     [
       input.productName,
@@ -189,6 +195,7 @@ export const updateProduct = (
       input.quantity,
       input.barcode,
       input.unit,
+      input.imageUri ?? null,
       id,
     ]
   );

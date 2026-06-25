@@ -10,6 +10,7 @@ import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-ca
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import CustomButton from '../components/CustomButton';
+import ProductImage from '../components/ProductImage';
 import { useProducts } from '../context/ProductContext';
 import { Product } from '../models/Product';
 import { COLORS } from '../utils/constants';
@@ -134,8 +135,15 @@ const ScannerScreen: React.FC = () => {
       ) : (
         <View style={styles.productPanel}>
           <View style={styles.productHeader}>
-            <Ionicons name="checkmark-circle" size={32} color={COLORS.success} />
-            <Text style={styles.productTitle}>Product Found</Text>
+            <ProductImage
+              imageUri={product.imageUri}
+              category={product.category}
+              size={96}
+            />
+            <View style={styles.productHeaderText}>
+              <Ionicons name="checkmark-circle" size={28} color={COLORS.success} />
+              <Text style={styles.productTitle}>พบสินค้าแล้ว</Text>
+            </View>
           </View>
 
           <View style={styles.infoCard}>
@@ -252,8 +260,12 @@ const styles = StyleSheet.create({
   productHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 14,
     marginBottom: 20,
+  },
+  productHeaderText: {
+    flex: 1,
+    gap: 4,
   },
   productTitle: {
     fontSize: 22,

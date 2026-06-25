@@ -79,7 +79,7 @@ export const generateBarcode = (): string => {
   const random = Math.floor(Math.random() * 10000)
     .toString()
     .padStart(4, '0');
-  return `SSM${timestamp}${random}`;
+  return `SMM${timestamp}${random}`;
 };
 
 export const isSameDay = (dateA: string, dateB: string): boolean => {

@@ -14,10 +14,12 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import CustomButton from '../components/CustomButton';
+import ProductImagePicker from '../components/ProductImagePicker';
 import { useProducts } from '../context/ProductContext';
 import { ProductsStackParamList } from '../navigation/AppNavigator';
 import { COLORS, PRODUCT_CATEGORIES, PRODUCT_UNITS } from '../utils/constants';
 import { generateBarcode, validateProduct } from '../utils/helpers';
+import { getCategoryDefaultImage } from '../utils/productImages';
 
 type NavigationProp = NativeStackNavigationProp<ProductsStackParamList, 'AddProduct'>;
 
@@ -30,6 +32,7 @@ const AddProductScreen: React.FC = () => {
   const [quantity, setQuantity] = useState('0');
   const [barcode, setBarcode] = useState(generateBarcode());
   const [unit, setUnit] = useState(PRODUCT_UNITS[0]);
+  const [imageUri, setImageUri] = useState(getCategoryDefaultImage(PRODUCT_CATEGORIES[0]));
   const [validationError, setValidationError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -57,6 +60,7 @@ const AddProductScreen: React.FC = () => {
         quantity: Number(quantity),
         barcode: barcode.trim(),
         unit,
+        imageUri,
       });
       Alert.alert('Success', 'Product added successfully', [
         { text: 'OK', onPress: () => navigation.goBack() },
@@ -102,11 +106,22 @@ const AddProductScreen: React.FC = () => {
                   key={item}
                   label={item}
                   selected={category === item}
-                  onPress={() => setCategory(item)}
+                  onPress={() => {
+                    setCategory(item);
+                    setImageUri(getCategoryDefaultImage(item));
+                  }}
                 />
               ))}
             </View>
           </ScrollView>
+        </FormField>
+
+        <FormField label="Product Image">
+          <ProductImagePicker
+            category={category}
+            imageUri={imageUri}
+            onChange={setImageUri}
+          />
         </FormField>
 
         <FormField label="Quantity">

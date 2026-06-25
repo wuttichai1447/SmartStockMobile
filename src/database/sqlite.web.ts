@@ -6,8 +6,9 @@ import {
   Transaction,
   TransactionType,
 } from '../models/Product';
+import { MARKET_SAMPLE_PRODUCTS } from '../utils/sampleProducts';
 
-const STORAGE_KEY = 'smart_stock_web_db';
+const STORAGE_KEY = 'smart_stock_web_db_v2';
 
 interface WebDatabase {
   products: Product[];
@@ -58,31 +59,8 @@ const withProductName = (transaction: Omit<Transaction, 'productName'>): Transac
 
 const seedSampleData = (database: WebDatabase): void => {
   const now = new Date().toISOString();
-  const samples: ProductInput[] = [
-    {
-      productName: 'Wireless Mouse',
-      category: 'Electronics',
-      quantity: 120,
-      barcode: 'SSM10010001',
-      unit: 'pcs',
-    },
-    {
-      productName: 'A4 Copy Paper',
-      category: 'Office Supplies',
-      quantity: 500,
-      barcode: 'SSM10010002',
-      unit: 'pack',
-    },
-    {
-      productName: 'Industrial Gloves',
-      category: 'Hardware',
-      quantity: 75,
-      barcode: 'SSM10010003',
-      unit: 'box',
-    },
-  ];
 
-  for (const sample of samples) {
+  for (const sample of MARKET_SAMPLE_PRODUCTS) {
     const product: Product = {
       id: database.nextProductId++,
       ...sample,
@@ -92,9 +70,10 @@ const seedSampleData = (database: WebDatabase): void => {
   }
 
   database.transactions.push(
-    { id: database.nextTransactionId++, productId: 1, type: 'IN', quantity: 120, createdAt: now },
-    { id: database.nextTransactionId++, productId: 2, type: 'IN', quantity: 500, createdAt: now },
-    { id: database.nextTransactionId++, productId: 3, type: 'OUT', quantity: 25, createdAt: now }
+    { id: database.nextTransactionId++, productId: 1, type: 'IN', quantity: 45, createdAt: now },
+    { id: database.nextTransactionId++, productId: 2, type: 'IN', quantity: 28, createdAt: now },
+    { id: database.nextTransactionId++, productId: 3, type: 'OUT', quantity: 5, createdAt: now },
+    { id: database.nextTransactionId++, productId: 4, type: 'IN', quantity: 32, createdAt: now }
   );
 };
 

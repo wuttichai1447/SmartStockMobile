@@ -43,7 +43,7 @@ const LoginScreen: React.FC = () => {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Initializing Smart Stock...</Text>
+        <Text style={styles.loadingText}>กำลังเตรียมระบบ...</Text>
       </View>
     );
   }
@@ -59,16 +59,16 @@ const LoginScreen: React.FC = () => {
       >
         <View style={styles.logoContainer}>
           <View style={styles.logoCircle}>
-            <Ionicons name="cube" size={48} color={COLORS.textLight} />
+            <Ionicons name="storefront" size={48} color={COLORS.textLight} />
           </View>
-          <Text style={styles.title}>Smart Stock Mobile</Text>
-          <Text style={styles.subtitle}>Enterprise Inventory Management</Text>
+          <Text style={styles.title}>Smart Stock</Text>
+          <Text style={styles.subtitle}>ระบบจัดการสต็อก ตลาดสี่มุมเมือง</Text>
         </View>
 
         <View style={styles.formCard}>
           <Text style={styles.formTitle}>Sign In</Text>
           <Text style={styles.formSubtitle}>
-            Use demo credentials: admin / admin123
+            เข้าสู่ระบบด้วย admin / admin123
           </Text>
 
           {(validationError || error) && (
