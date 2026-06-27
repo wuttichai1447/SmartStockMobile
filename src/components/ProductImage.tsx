@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../utils/constants';
@@ -19,6 +19,10 @@ const ProductImage: React.FC<ProductImageProps> = ({
 }) => {
   const [hasError, setHasError] = useState(false);
   const uri = getProductImageUri({ imageUri, category });
+
+  useEffect(() => {
+    setHasError(false);
+  }, [uri]);
 
   if (hasError) {
     return (

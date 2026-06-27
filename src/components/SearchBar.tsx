@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../utils/constants';
+import { COLORS, LABELS } from '../utils/constants';
 
 interface SearchBarProps {
   value: string;
@@ -12,7 +12,7 @@ interface SearchBarProps {
 const SearchBar: React.FC<SearchBarProps> = ({
   value,
   onChangeText,
-  placeholder = 'Search products...',
+  placeholder = LABELS.search,
 }) => {
   return (
     <View style={styles.container}>

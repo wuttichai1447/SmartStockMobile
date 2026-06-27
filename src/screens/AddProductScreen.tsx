@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -10,31 +9,49 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import BarcodeScanField from '../components/BarcodeScanField';
+import BarcodeLabelModal from '../components/BarcodeLabelModal';
 import CustomButton from '../components/CustomButton';
+import DatePickerField from '../components/DatePickerField';
 import ProductImagePicker from '../components/ProductImagePicker';
 import { useProducts } from '../context/ProductContext';
 import { ProductsStackParamList } from '../navigation/AppNavigator';
-import { COLORS, PRODUCT_CATEGORIES, PRODUCT_UNITS } from '../utils/constants';
+import { COLORS, DEFAULT_MIN_STOCK, LABELS, PRODUCT_CATEGORIES, PRODUCT_UNITS } from '../utils/constants';
+import { showAlert } from '../utils/alert';
 import { generateBarcode, validateProduct } from '../utils/helpers';
 import { getCategoryDefaultImage } from '../utils/productImages';
 
 type NavigationProp = NativeStackNavigationProp<ProductsStackParamList, 'AddProduct'>;
+type RouteProps = RouteProp<ProductsStackParamList, 'AddProduct'>;
 
 const AddProductScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
-  const { addProduct } = useProducts();
-
+  const route = useRoute<RouteProps>();
+  const { addProduct, findByBarcode } = useProducts();
   const [productName, setProductName] = useState('');
   const [category, setCategory] = useState(PRODUCT_CATEGORIES[0]);
   const [quantity, setQuantity] = useState('0');
   const [barcode, setBarcode] = useState(generateBarcode());
   const [unit, setUnit] = useState(PRODUCT_UNITS[0]);
+  const [price, setPrice] = useState('0');
+  const [minStock, setMinStock] = useState(String(DEFAULT_MIN_STOCK));
+  const [expiryDate, setExpiryDate] = useState('');
   const [imageUri, setImageUri] = useState(getCategoryDefaultImage(PRODUCT_CATEGORIES[0]));
+  const [hasCustomImage, setHasCustomImage] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showBarcodeLabel, setShowBarcodeLabel] = useState(false);
+
+  useEffect(() => {
+    if (route.params?.barcode) {
+      setBarcode(route.params.barcode);
+    }
+  }, [route.params?.barcode]);
+
+  const checkDuplicateBarcode = (code: string) => Boolean(findByBarcode(code.trim()));
 
   const handleSubmit = async () => {
     const validation = validateProduct({
@@ -43,6 +60,9 @@ const AddProductScreen: React.FC = () => {
       quantity,
       barcode,
       unit,
+      price,
+      minStock,
+      expiryDate: expiryDate.trim() || undefined,
     });
 
     if (!validation.valid) {
@@ -60,13 +80,14 @@ const AddProductScreen: React.FC = () => {
         quantity: Number(quantity),
         barcode: barcode.trim(),
         unit,
-        imageUri,
+        price: Number(price),
+        minStock: Number(minStock),
+        expiryDate: expiryDate.trim() || null,
+        imageUri: hasCustomImage ? imageUri : null,
       });
-      Alert.alert('Success', 'Product added successfully', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
+      showAlert('สำเร็จ', 'เพิ่มสินค้าเรียบร้อยแล้ว', () => navigation.goBack());
     } catch (err) {
-      Alert.alert(
+      showAlert(
         'Error',
         err instanceof Error ? err.message : 'Failed to add product'
       );
@@ -88,17 +109,17 @@ const AddProductScreen: React.FC = () => {
           </View>
         )}
 
-        <FormField label="Product Name">
+        <FormField label="ชื่อสินค้า">
           <TextInput
             style={styles.input}
             value={productName}
             onChangeText={setProductName}
-            placeholder="Enter product name"
+            placeholder="กรอกชื่อสินค้า"
             placeholderTextColor={COLORS.textSecondary}
           />
         </FormField>
 
-        <FormField label="Category">
+        <FormField label="หมวดหมู่">
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.chipRow}>
               {PRODUCT_CATEGORIES.map((item) => (
@@ -108,7 +129,9 @@ const AddProductScreen: React.FC = () => {
                   selected={category === item}
                   onPress={() => {
                     setCategory(item);
-                    setImageUri(getCategoryDefaultImage(item));
+                    if (!hasCustomImage) {
+                      setImageUri(getCategoryDefaultImage(item));
+                    }
                   }}
                 />
               ))}
@@ -116,15 +139,16 @@ const AddProductScreen: React.FC = () => {
           </ScrollView>
         </FormField>
 
-        <FormField label="Product Image">
+        <FormField label="รูปสินค้า">
           <ProductImagePicker
             category={category}
             imageUri={imageUri}
             onChange={setImageUri}
+            onCustomImageChange={setHasCustomImage}
           />
         </FormField>
 
-        <FormField label="Quantity">
+        <FormField label="จำนวน">
           <TextInput
             style={styles.input}
             value={quantity}
@@ -135,7 +159,37 @@ const AddProductScreen: React.FC = () => {
           />
         </FormField>
 
-        <FormField label="Unit">
+        <FormField label="ราคา (บาท)">
+          <TextInput
+            style={styles.input}
+            value={price}
+            onChangeText={setPrice}
+            placeholder="0"
+            placeholderTextColor={COLORS.textSecondary}
+            keyboardType="numeric"
+          />
+        </FormField>
+
+        <FormField label="สต็อกขั้นต่ำ">
+          <TextInput
+            style={styles.input}
+            value={minStock}
+            onChangeText={setMinStock}
+            placeholder={String(DEFAULT_MIN_STOCK)}
+            placeholderTextColor={COLORS.textSecondary}
+            keyboardType="numeric"
+          />
+        </FormField>
+
+        <FormField label="วันหมดอายุ (ไม่บังคับ)">
+          <DatePickerField
+            value={expiryDate}
+            onChange={setExpiryDate}
+            minimumDate={new Date()}
+          />
+        </FormField>
+
+        <FormField label="หน่วย">
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.chipRow}>
               {PRODUCT_UNITS.map((item) => (
@@ -150,27 +204,38 @@ const AddProductScreen: React.FC = () => {
           </ScrollView>
         </FormField>
 
-        <FormField label="Barcode">
-          <View style={styles.barcodeRow}>
-            <TextInput
-              style={[styles.input, styles.barcodeInput]}
-              value={barcode}
-              onChangeText={setBarcode}
-              placeholder="Enter or generate barcode"
-              placeholderTextColor={COLORS.textSecondary}
-              autoCapitalize="characters"
-            />
+        <FormField label="บาร์โค้ด">
+          <BarcodeScanField
+            value={barcode}
+            onChange={setBarcode}
+            onDuplicate={checkDuplicateBarcode}
+            showGenerate
+            onGenerate={() => setBarcode(generateBarcode())}
+          />
+          {barcode.trim() ? (
             <TouchableOpacity
-              style={styles.generateButton}
-              onPress={() => setBarcode(generateBarcode())}
+              style={styles.previewBarcodeButton}
+              onPress={() => setShowBarcodeLabel(true)}
             >
-              <Ionicons name="refresh" size={20} color={COLORS.primary} />
+              <Ionicons name="barcode-outline" size={18} color={COLORS.primary} />
+              <Text style={styles.previewBarcodeText}>{LABELS.previewBarcode}</Text>
             </TouchableOpacity>
-          </View>
+          ) : null}
         </FormField>
 
+        <BarcodeLabelModal
+          visible={showBarcodeLabel}
+          label={{
+            productName: productName.trim() || 'สินค้าใหม่',
+            barcode: barcode.trim(),
+            price: Number(price) || 0,
+            unit,
+          }}
+          onClose={() => setShowBarcodeLabel(false)}
+        />
+
         <CustomButton
-          title="Add Product"
+          title={LABELS.addProduct}
           onPress={handleSubmit}
           loading={isSubmitting}
           style={styles.submitButton}
@@ -289,6 +354,23 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     marginTop: 8,
+  },
+  previewBarcodeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 10,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: COLORS.primary + '10',
+    borderWidth: 1,
+    borderColor: COLORS.primary + '30',
+  },
+  previewBarcodeText: {
+    color: COLORS.primary,
+    fontWeight: '600',
+    fontSize: 14,
   },
 });
 

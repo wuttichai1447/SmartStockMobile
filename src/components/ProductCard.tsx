@@ -2,8 +2,15 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Product } from '../models/Product';
-import { COLORS } from '../utils/constants';
-import { formatDateShort } from '../utils/helpers';
+import { COLORS, LABELS } from '../utils/constants';
+import {
+  formatCurrency,
+  formatDateShort,
+  getExpiryLabel,
+  isExpired,
+  isExpiringSoon,
+  isLowStock,
+} from '../utils/helpers';
 import ProductImage from './ProductImage';
 
 interface ProductCardProps {
@@ -19,43 +26,77 @@ const ProductCard: React.FC<ProductCardProps> = ({
   onEdit,
   onDelete,
 }) => {
-  const isLowStock = product.quantity <= 10;
+  const lowStock = isLowStock(product);
+  const expiring = isExpiringSoon(product);
+  const expired = isExpired(product);
+  const expiryLabel = getExpiryLabel(product.expiryDate);
 
   return (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={() => onPress(product)}
-      activeOpacity={0.85}
-    >
-      <View style={styles.header}>
-        <ProductImage
-          imageUri={product.imageUri}
-          category={product.category}
-          size={72}
-        />
-        <View style={styles.titleContainer}>
-          <Text style={styles.name} numberOfLines={1}>
-            {product.productName}
-          </Text>
-          <Text style={styles.category}>{product.category}</Text>
+    <View style={styles.card}>
+      <TouchableOpacity onPress={() => onPress(product)} activeOpacity={0.85}>
+        <View style={styles.header}>
+          <ProductImage
+            imageUri={product.imageUri}
+            category={product.category}
+            size={72}
+          />
+          <View style={styles.titleContainer}>
+            <Text style={styles.name} numberOfLines={1}>
+              {product.productName}
+            </Text>
+            <Text style={styles.category}>{product.category}</Text>
+            <Text style={styles.price}>{formatCurrency(product.price)}/{product.unit}</Text>
+          </View>
+          <View style={[styles.quantityBadge, lowStock && styles.lowStockBadge]}>
+            <Text style={[styles.quantityText, lowStock && styles.lowStockText]}>
+              {product.quantity} {product.unit}
+            </Text>
+          </View>
         </View>
-        <View style={[styles.quantityBadge, isLowStock && styles.lowStockBadge]}>
-          <Text style={styles.quantityText}>
-            {product.quantity} {product.unit}
-          </Text>
-        </View>
-      </View>
 
-      <View style={styles.details}>
-        <View style={styles.detailRow}>
-          <Ionicons name="barcode-outline" size={16} color={COLORS.textSecondary} />
-          <Text style={styles.detailText}>{product.barcode}</Text>
+        <View style={styles.badges}>
+          {lowStock && (
+            <View style={[styles.badge, styles.warningBadge]}>
+              <Ionicons name="warning-outline" size={12} color={COLORS.warning} />
+              <Text style={styles.warningText}>สต็อกต่ำ</Text>
+            </View>
+          )}
+          {expiryLabel && (
+            <View
+              style={[
+                styles.badge,
+                expired ? styles.errorBadge : expiring ? styles.expiryBadge : styles.neutralBadge,
+              ]}
+            >
+              <Ionicons
+                name="calendar-outline"
+                size={12}
+                color={expired ? COLORS.error : expiring ? COLORS.expiry : COLORS.textSecondary}
+              />
+              <Text
+                style={[
+                  styles.badgeText,
+                  expired && styles.errorText,
+                  expiring && styles.expiryText,
+                ]}
+              >
+                {expiryLabel}
+              </Text>
+            </View>
+          )}
         </View>
-        <View style={styles.detailRow}>
-          <Ionicons name="calendar-outline" size={16} color={COLORS.textSecondary} />
-          <Text style={styles.detailText}>{formatDateShort(product.createdAt)}</Text>
+
+        <View style={styles.details}>
+          <View style={styles.detailRow}>
+            <Ionicons name="barcode-outline" size={16} color={COLORS.textSecondary} />
+            <Text style={styles.detailText}>{product.barcode}</Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Ionicons name="calendar-outline" size={16} color={COLORS.textSecondary} />
+            <Text style={styles.detailText}>{formatDateShort(product.createdAt)}</Text>
+          </View>
         </View>
-      </View>
+      </TouchableOpacity>
 
       {(onEdit || onDelete) && (
         <View style={styles.actions}>
@@ -65,7 +106,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
               onPress={() => onEdit(product)}
             >
               <Ionicons name="create-outline" size={18} color={COLORS.primary} />
-              <Text style={styles.editText}>Edit</Text>
+              <Text style={styles.editText}>{LABELS.editProduct}</Text>
             </TouchableOpacity>
           )}
           {onDelete && (
@@ -74,12 +115,12 @@ const ProductCard: React.FC<ProductCardProps> = ({
               onPress={() => onDelete(product)}
             >
               <Ionicons name="trash-outline" size={18} color={COLORS.error} />
-              <Text style={styles.deleteText}>Delete</Text>
+              <Text style={styles.deleteText}>{LABELS.delete}</Text>
             </TouchableOpacity>
           )}
         </View>
       )}
-    </TouchableOpacity>
+    </View>
   );
 };
 
@@ -101,7 +142,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
     gap: 12,
   },
   titleContainer: {
@@ -118,6 +159,12 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     fontWeight: '500',
   },
+  price: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.primary,
+    marginTop: 4,
+  },
   quantityBadge: {
     backgroundColor: COLORS.primaryLight + '20',
     paddingHorizontal: 10,
@@ -131,6 +178,51 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: COLORS.primary,
+  },
+  lowStockText: {
+    color: COLORS.warning,
+  },
+  badges: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 8,
+  },
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  warningBadge: {
+    backgroundColor: COLORS.warning + '15',
+  },
+  expiryBadge: {
+    backgroundColor: COLORS.expiry + '15',
+  },
+  errorBadge: {
+    backgroundColor: COLORS.error + '15',
+  },
+  neutralBadge: {
+    backgroundColor: COLORS.background,
+  },
+  warningText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.warning,
+  },
+  badgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+  },
+  expiryText: {
+    color: COLORS.expiry,
+  },
+  errorText: {
+    color: COLORS.error,
   },
   details: {
     gap: 6,

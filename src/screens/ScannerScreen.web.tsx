@@ -1,24 +1,29 @@
 import React, { useCallback, useState } from 'react';
 import {
-  Alert,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import BarcodeScanField from '../components/BarcodeScanField';
 import CustomButton from '../components/CustomButton';
 import ProductImage from '../components/ProductImage';
 import { useProducts } from '../context/ProductContext';
 import { Product } from '../models/Product';
-import { COLORS } from '../utils/constants';
-import { DEMO_BARCODES } from '../utils/sampleProducts';
+import { MainTabParamList } from '../navigation/AppNavigator';
+import { COLORS, LABELS } from '../utils/constants';
+import { formatCurrency } from '../utils/helpers';
+import { showAlert } from '../utils/alert';
 
 const ScannerScreen: React.FC = () => {
+  const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList>>();
   const { findByBarcode, recordStockMovement } = useProducts();
   const [barcodeInput, setBarcodeInput] = useState('');
   const [product, setProduct] = useState<Product | null>(null);
+  const [notFoundBarcode, setNotFoundBarcode] = useState<string | null>(null);
   const [quantity, setQuantity] = useState('1');
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -26,22 +31,32 @@ const ScannerScreen: React.FC = () => {
     useCallback(() => {
       setBarcodeInput('');
       setProduct(null);
+      setNotFoundBarcode(null);
       setQuantity('1');
     }, [])
   );
 
-  const handleLookup = () => {
-    const barcode = barcodeInput.trim();
-    if (!barcode) {
-      Alert.alert('Enter Barcode', 'Please enter a barcode to look up a product.');
+  const navigateToAddProduct = (barcode: string) => {
+    navigation.navigate('Products', {
+      screen: 'AddProduct',
+      params: { barcode },
+    });
+  };
+
+  const handleLookup = (barcode: string) => {
+    const trimmed = barcode.trim();
+    if (!trimmed) {
+      showAlert('กรอกบาร์โค้ด', 'กรุณากรอกบาร์โค้ดเพื่อค้นหาสินค้า');
       return;
     }
 
-    const found = findByBarcode(barcode);
+    const found = findByBarcode(trimmed);
     if (found) {
+      setNotFoundBarcode(null);
       setProduct(found);
     } else {
-      Alert.alert('Product Not Found', `No product found for barcode: ${barcode}`);
+      setProduct(null);
+      setNotFoundBarcode(trimmed);
     }
   };
 
@@ -50,7 +65,7 @@ const ScannerScreen: React.FC = () => {
 
     const qty = Number(quantity);
     if (Number.isNaN(qty) || qty <= 0) {
-      Alert.alert('Invalid Quantity', 'Please enter a valid quantity greater than zero');
+      showAlert('จำนวนไม่ถูกต้อง', 'กรุณากรอกจำนวนที่มากกว่า 0');
       return;
     }
 
@@ -58,57 +73,68 @@ const ScannerScreen: React.FC = () => {
     try {
       await recordStockMovement(product.id, type, qty);
       const updated = findByBarcode(product.barcode);
-      Alert.alert(
-        'Success',
-        `${type === 'IN' ? 'Stock In' : 'Stock Out'} recorded successfully`,
-        [
-          {
-            text: 'Look Up Another',
-            onPress: () => {
-              setProduct(null);
-              setBarcodeInput('');
-              setQuantity('1');
-            },
-          },
-          {
-            text: 'Continue',
-            onPress: () => {
-              if (updated) setProduct(updated);
-            },
-          },
-        ]
+      if (updated) setProduct(updated);
+      showAlert(
+        'สำเร็จ',
+        `${type === 'IN' ? LABELS.stockIn : LABELS.stockOut} บันทึกเรียบร้อยแล้ว`
       );
     } catch (err) {
-      Alert.alert(
-        'Error',
-        err instanceof Error ? err.message : 'Failed to update stock'
+      showAlert(
+        'ข้อผิดพลาด',
+        err instanceof Error ? err.message : 'อัปเดตสต็อกไม่สำเร็จ'
       );
     } finally {
       setIsProcessing(false);
     }
   };
 
+  if (notFoundBarcode && !product) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.lookupPanel}>
+          <Ionicons name="alert-circle-outline" size={64} color={COLORS.warning} />
+          <Text style={styles.title}>ไม่พบสินค้า</Text>
+          <Text style={styles.subtitle}>
+            บาร์โค้ด {notFoundBarcode} ยังไม่มีในระบบ{'\n'}
+            ต้องการเพิ่มเป็นสินค้าใหม่หรือไม่?
+          </Text>
+
+          <CustomButton
+            title="เพิ่มสินค้าใหม่ด้วยบาร์โค้ดนี้"
+            onPress={() => navigateToAddProduct(notFoundBarcode)}
+          />
+          <CustomButton
+            title="สแกน/ค้นหาใหม่"
+            onPress={() => {
+              setNotFoundBarcode(null);
+              setBarcodeInput('');
+            }}
+            variant="outline"
+          />
+        </View>
+      </View>
+    );
+  }
+
   if (!product) {
     return (
       <View style={styles.container}>
         <View style={styles.lookupPanel}>
           <Ionicons name="barcode-outline" size={64} color={COLORS.primary} />
-          <Text style={styles.title}>Barcode Lookup</Text>
+          <Text style={styles.title}>สแกนหรือค้นหาบาร์โค้ด</Text>
           <Text style={styles.subtitle}>
-            กรอกบาร์โค้ดเพื่อค้นหาสินค้า เช่น {DEMO_BARCODES.slice(0, 3).join(', ')}
+            สแกนบาร์โค้ดจริงจากสินค้า หรือกรอกเพื่อรับเข้า/จ่ายออกสต็อก
           </Text>
 
-          <TextInput
-            style={styles.barcodeInput}
+          <View style={styles.scanFieldWrap}>
+            <BarcodeScanField
             value={barcodeInput}
-            onChangeText={setBarcodeInput}
-            placeholder="Enter barcode"
-            placeholderTextColor={COLORS.textSecondary}
-            autoCapitalize="characters"
-            onSubmitEditing={handleLookup}
+            onChange={setBarcodeInput}
+            onScanned={handleLookup}
           />
+          </View>
 
-          <CustomButton title="Find Product" onPress={handleLookup} />
+          <CustomButton title="ค้นหาสินค้า" onPress={() => handleLookup(barcodeInput)} />
         </View>
       </View>
     );
@@ -130,32 +156,33 @@ const ScannerScreen: React.FC = () => {
         </View>
 
         <View style={styles.infoCard}>
-          <InfoRow label="Name" value={product.productName} />
-          <InfoRow label="Category" value={product.category} />
-          <InfoRow label="Barcode" value={product.barcode} />
-          <InfoRow label="Current Stock" value={`${product.quantity} ${product.unit}`} />
+          <InfoRow label="ชื่อ" value={product.productName} />
+          <InfoRow label="หมวดหมู่" value={product.category} />
+          <InfoRow label="บาร์โค้ด" value={product.barcode} />
+          <InfoRow label="ราคา" value={formatCurrency(product.price)} />
+          <InfoRow label="สต็อกปัจจุบัน" value={`${product.quantity} ${product.unit}`} />
         </View>
 
-        <Text style={styles.quantityLabel}>Movement Quantity</Text>
+        <Text style={styles.quantityLabel}>จำนวนที่ต้องการบันทึก</Text>
         <TextInput
           style={styles.quantityInput}
           value={quantity}
           onChangeText={setQuantity}
           keyboardType="numeric"
-          placeholder="Enter quantity"
+          placeholder="กรอกจำนวน"
           placeholderTextColor={COLORS.textSecondary}
         />
 
         <View style={styles.actionRow}>
           <CustomButton
-            title="Stock In"
+            title={LABELS.stockIn}
             onPress={() => handleStockMovement('IN')}
             loading={isProcessing}
             variant="secondary"
             style={styles.actionButton}
           />
           <CustomButton
-            title="Stock Out"
+            title={LABELS.stockOut}
             onPress={() => handleStockMovement('OUT')}
             loading={isProcessing}
             variant="danger"
@@ -164,7 +191,7 @@ const ScannerScreen: React.FC = () => {
         </View>
 
         <CustomButton
-          title="Look Up Another"
+          title="ค้นหารายการอื่น"
           onPress={() => {
             setProduct(null);
             setBarcodeInput('');
@@ -196,6 +223,9 @@ const styles = StyleSheet.create({
     gap: 16,
     alignItems: 'center',
   },
+  scanFieldWrap: {
+    width: '100%',
+  },
   title: {
     fontSize: 22,
     fontWeight: '700',
@@ -206,17 +236,6 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
-  },
-  barcodeInput: {
-    width: '100%',
-    backgroundColor: COLORS.surface,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: COLORS.text,
-    borderWidth: 1,
-    borderColor: COLORS.border,
   },
   productPanel: {
     flex: 1,

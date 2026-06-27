@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -14,11 +13,14 @@ import {
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import BarcodeScanField from '../components/BarcodeScanField';
+import BarcodeLabelModal from '../components/BarcodeLabelModal';
 import CustomButton from '../components/CustomButton';
+import DatePickerField from '../components/DatePickerField';
 import ProductImagePicker from '../components/ProductImagePicker';
-import { useProducts } from '../context/ProductContext';
-import { ProductsStackParamList } from '../navigation/AppNavigator';
-import { COLORS, PRODUCT_CATEGORIES, PRODUCT_UNITS } from '../utils/constants';
+import { useProducts } from '../context/ProductContext';import { ProductsStackParamList } from '../navigation/AppNavigator';
+import { COLORS, DEFAULT_MIN_STOCK, LABELS, PRODUCT_CATEGORIES, PRODUCT_UNITS } from '../utils/constants';
+import { showAlert } from '../utils/alert';
 import { validateProduct } from '../utils/helpers';
 import { getCategoryDefaultImage } from '../utils/productImages';
 
@@ -28,17 +30,21 @@ type NavigationProp = NativeStackNavigationProp<ProductsStackParamList, 'EditPro
 const EditProductScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
-  const { getProduct, updateProduct } = useProducts();
-
+  const { getProduct, updateProduct, findByBarcode } = useProducts();
   const [productName, setProductName] = useState('');
   const [category, setCategory] = useState(PRODUCT_CATEGORIES[0]);
   const [quantity, setQuantity] = useState('0');
   const [barcode, setBarcode] = useState('');
   const [unit, setUnit] = useState(PRODUCT_UNITS[0]);
+  const [price, setPrice] = useState('0');
+  const [minStock, setMinStock] = useState(String(DEFAULT_MIN_STOCK));
+  const [expiryDate, setExpiryDate] = useState('');
   const [imageUri, setImageUri] = useState('');
+  const [hasCustomImage, setHasCustomImage] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [showBarcodeLabel, setShowBarcodeLabel] = useState(false);
 
   useEffect(() => {
     const product = getProduct(route.params.productId);
@@ -48,11 +54,13 @@ const EditProductScreen: React.FC = () => {
       setQuantity(product.quantity.toString());
       setBarcode(product.barcode);
       setUnit(product.unit);
+      setPrice(product.price.toString());
+      setMinStock(product.minStock.toString());
+      setExpiryDate(product.expiryDate ?? '');
       setImageUri(product.imageUri ?? getCategoryDefaultImage(product.category));
+      setHasCustomImage(Boolean(product.imageUri));
     } else {
-      Alert.alert('Error', 'Product not found', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
+      showAlert('ข้อผิดพลาด', 'ไม่พบสินค้า', () => navigation.goBack());
     }
     setIsLoading(false);
   }, [getProduct, navigation, route.params.productId]);
@@ -64,6 +72,9 @@ const EditProductScreen: React.FC = () => {
       quantity,
       barcode,
       unit,
+      price,
+      minStock,
+      expiryDate: expiryDate.trim() || undefined,
     });
 
     if (!validation.valid) {
@@ -81,13 +92,14 @@ const EditProductScreen: React.FC = () => {
         quantity: Number(quantity),
         barcode: barcode.trim(),
         unit,
-        imageUri,
+        price: Number(price),
+        minStock: Number(minStock),
+        expiryDate: expiryDate.trim() || null,
+        imageUri: hasCustomImage ? imageUri : null,
       });
-      Alert.alert('Success', 'Product updated successfully', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
+      showAlert('สำเร็จ', 'แก้ไขสินค้าเรียบร้อยแล้ว', () => navigation.goBack());
     } catch (err) {
-      Alert.alert(
+      showAlert(
         'Error',
         err instanceof Error ? err.message : 'Failed to update product'
       );
@@ -118,23 +130,23 @@ const EditProductScreen: React.FC = () => {
         )}
 
         <View style={styles.field}>
-          <Text style={styles.label}>Product ID</Text>
+          <Text style={styles.label}>รหัสสินค้า</Text>
           <Text style={styles.readOnlyValue}>#{route.params.productId}</Text>
         </View>
 
         <View style={styles.field}>
-          <Text style={styles.label}>Product Name</Text>
+          <Text style={styles.label}>ชื่อสินค้า</Text>
           <TextInput
             style={styles.input}
             value={productName}
             onChangeText={setProductName}
-            placeholder="Enter product name"
+            placeholder="กรอกชื่อสินค้า"
             placeholderTextColor={COLORS.textSecondary}
           />
         </View>
 
         <View style={styles.field}>
-          <Text style={styles.label}>Category</Text>
+          <Text style={styles.label}>หมวดหมู่</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.chipRow}>
               {PRODUCT_CATEGORIES.map((item) => (
@@ -143,7 +155,9 @@ const EditProductScreen: React.FC = () => {
                   style={[styles.chip, category === item && styles.chipSelected]}
                   onPress={() => {
                     setCategory(item);
-                    setImageUri(getCategoryDefaultImage(item));
+                    if (!hasCustomImage) {
+                      setImageUri(getCategoryDefaultImage(item));
+                    }
                   }}
                 >
                   <Text
@@ -161,16 +175,17 @@ const EditProductScreen: React.FC = () => {
         </View>
 
         <View style={styles.field}>
-          <Text style={styles.label}>Product Image</Text>
+          <Text style={styles.label}>แก้ไขรูปสินค้า</Text>
           <ProductImagePicker
             category={category}
             imageUri={imageUri}
             onChange={setImageUri}
+            onCustomImageChange={setHasCustomImage}
+            mode="edit"
           />
         </View>
-
         <View style={styles.field}>
-          <Text style={styles.label}>Quantity</Text>
+          <Text style={styles.label}>จำนวน</Text>
           <TextInput
             style={styles.input}
             value={quantity}
@@ -180,7 +195,31 @@ const EditProductScreen: React.FC = () => {
         </View>
 
         <View style={styles.field}>
-          <Text style={styles.label}>Unit</Text>
+          <Text style={styles.label}>ราคา (บาท)</Text>
+          <TextInput
+            style={styles.input}
+            value={price}
+            onChangeText={setPrice}
+            keyboardType="numeric"
+          />
+        </View>
+
+        <View style={styles.field}>
+          <Text style={styles.label}>สต็อกขั้นต่ำ</Text>
+          <TextInput
+            style={styles.input}
+            value={minStock}
+            onChangeText={setMinStock}
+            keyboardType="numeric"
+          />
+        </View>
+
+        <View style={styles.field}>
+          <Text style={styles.label}>วันหมดอายุ (ไม่บังคับ)</Text>
+          <DatePickerField value={expiryDate} onChange={setExpiryDate} />
+        </View>
+        <View style={styles.field}>
+          <Text style={styles.label}>หน่วย</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.chipRow}>
               {PRODUCT_UNITS.map((item) => (
@@ -201,17 +240,38 @@ const EditProductScreen: React.FC = () => {
         </View>
 
         <View style={styles.field}>
-          <Text style={styles.label}>Barcode</Text>
-          <TextInput
-            style={styles.input}
+          <Text style={styles.label}>บาร์โค้ด</Text>
+          <BarcodeScanField
             value={barcode}
-            onChangeText={setBarcode}
-            autoCapitalize="characters"
+            onChange={setBarcode}
+            onDuplicate={(code) => {
+              const found = findByBarcode(code.trim());
+              return found !== null && found.id !== route.params.productId;
+            }}
           />
+          {barcode.trim() ? (
+            <TouchableOpacity
+              style={styles.previewBarcodeButton}
+              onPress={() => setShowBarcodeLabel(true)}
+            >
+              <Ionicons name="print-outline" size={18} color={COLORS.primary} />
+              <Text style={styles.previewBarcodeText}>{LABELS.printBarcode}</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
 
+        <BarcodeLabelModal
+          visible={showBarcodeLabel}
+          label={{
+            productName: productName.trim(),
+            barcode: barcode.trim(),
+            price: Number(price) || 0,
+            unit,
+          }}
+          onClose={() => setShowBarcodeLabel(false)}
+        />
         <CustomButton
-          title="Save Changes"
+          title={LABELS.save}
           onPress={handleSubmit}
           loading={isSubmitting}
           style={styles.submitButton}
@@ -300,6 +360,23 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     marginTop: 8,
+  },
+  previewBarcodeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 10,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: COLORS.primary + '10',
+    borderWidth: 1,
+    borderColor: COLORS.primary + '30',
+  },
+  previewBarcodeText: {
+    color: COLORS.primary,
+    fontWeight: '600',
+    fontSize: 14,
   },
 });
 

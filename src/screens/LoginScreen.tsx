@@ -12,7 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import CustomButton from '../components/CustomButton';
 import { useProducts } from '../context/ProductContext';
-import { COLORS } from '../utils/constants';
+import { COLORS, LABELS } from '../utils/constants';
 import { validateLogin } from '../utils/helpers';
 
 const LoginScreen: React.FC = () => {
@@ -62,11 +62,11 @@ const LoginScreen: React.FC = () => {
             <Ionicons name="storefront" size={48} color={COLORS.textLight} />
           </View>
           <Text style={styles.title}>Smart Stock</Text>
-          <Text style={styles.subtitle}>ระบบจัดการสต็อก ตลาดสี่มุมเมือง</Text>
+          <Text style={styles.subtitle}>ระบบจัดการสต็อก — ตลาด</Text>
         </View>
 
         <View style={styles.formCard}>
-          <Text style={styles.formTitle}>Sign In</Text>
+          <Text style={styles.formTitle}>{LABELS.login}</Text>
           <Text style={styles.formSubtitle}>
             เข้าสู่ระบบด้วย admin / admin123
           </Text>
@@ -79,14 +79,14 @@ const LoginScreen: React.FC = () => {
           )}
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Username</Text>
+            <Text style={styles.label}>ชื่อผู้ใช้</Text>
             <View style={styles.inputWrapper}>
               <Ionicons name="person-outline" size={20} color={COLORS.textSecondary} />
               <TextInput
                 style={styles.input}
                 value={username}
                 onChangeText={setUsername}
-                placeholder="Enter username"
+                placeholder="กรอกชื่อผู้ใช้"
                 placeholderTextColor={COLORS.textSecondary}
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -95,14 +95,14 @@ const LoginScreen: React.FC = () => {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Password</Text>
+            <Text style={styles.label}>รหัสผ่าน</Text>
             <View style={styles.inputWrapper}>
               <Ionicons name="lock-closed-outline" size={20} color={COLORS.textSecondary} />
               <TextInput
                 style={styles.input}
                 value={password}
                 onChangeText={setPassword}
-                placeholder="Enter password"
+                placeholder="กรอกรหัสผ่าน"
                 placeholderTextColor={COLORS.textSecondary}
                 secureTextEntry
               />
@@ -110,7 +110,7 @@ const LoginScreen: React.FC = () => {
           </View>
 
           <CustomButton
-            title="Login"
+            title={LABELS.login}
             onPress={handleLogin}
             loading={isSubmitting}
             style={styles.loginButton}

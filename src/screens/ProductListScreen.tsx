@@ -1,7 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Modal,
   StyleSheet,
@@ -15,11 +14,15 @@ import { Ionicons } from '@expo/vector-icons';
 import ProductCard from '../components/ProductCard';
 import SearchBar from '../components/SearchBar';
 import CustomButton from '../components/CustomButton';
+import ProductImage from '../components/ProductImage';
 import { useProducts } from '../context/ProductContext';
+import ProductImageEditorModal from '../components/ProductImageEditorModal';
+import BarcodeLabelModal from '../components/BarcodeLabelModal';
 import { Product } from '../models/Product';
 import { ProductsStackParamList } from '../navigation/AppNavigator';
-import { COLORS } from '../utils/constants';
-import { formatDateShort } from '../utils/helpers';
+import { COLORS, LABELS } from '../utils/constants';
+import { showAlert, showConfirm } from '../utils/alert';
+import { formatCurrency, formatDateShort, getExpiryLabel } from '../utils/helpers';
 
 type NavigationProp = NativeStackNavigationProp<ProductsStackParamList, 'ProductList'>;
 
@@ -29,6 +32,8 @@ const ProductListScreen: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [showImageEditor, setShowImageEditor] = useState(false);
+  const [showBarcodeLabel, setShowBarcodeLabel] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -42,23 +47,21 @@ const ProductListScreen: React.FC = () => {
   };
 
   const handleDelete = (product: Product) => {
-    Alert.alert(
-      'Delete Product',
-      `Are you sure you want to delete "${product.productName}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteProduct(product.id);
-            } catch {
-              Alert.alert('Error', 'Failed to delete product');
-            }
-          },
-        },
-      ]
+    showConfirm(
+      'ลบสินค้า',
+      `ต้องการลบ "${product.productName}" ใช่หรือไม่?`,
+      async () => {
+        try {
+          await deleteProduct(product.id);
+          if (selectedProduct?.id === product.id) {
+            setShowDetails(false);
+            setSelectedProduct(null);
+          }
+        } catch {
+          showAlert('ข้อผิดพลาด', 'ลบสินค้าไม่สำเร็จ');
+        }
+      },
+      { confirmText: 'ลบ', destructive: true }
     );
   };
 
@@ -95,9 +98,9 @@ const ProductListScreen: React.FC = () => {
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <Ionicons name="cube-outline" size={48} color={COLORS.border} />
-              <Text style={styles.emptyTitle}>No products found</Text>
+              <Text style={styles.emptyTitle}>ไม่พบสินค้า</Text>
               <Text style={styles.emptySubtitle}>
-                Add a new product or adjust your search
+                เพิ่มสินค้าใหม่หรือลองค้นหาด้วยคำอื่น
               </Text>
             </View>
           }
@@ -118,6 +121,11 @@ const ProductListScreen: React.FC = () => {
             {selectedProduct && (
               <>
                 <View style={styles.modalHeader}>
+                  <ProductImage
+                    imageUri={selectedProduct.imageUri}
+                    category={selectedProduct.category}
+                    size={72}
+                  />
                   <Text style={styles.modalTitle}>{selectedProduct.productName}</Text>
                   <TouchableOpacity onPress={() => setShowDetails(false)}>
                     <Ionicons name="close" size={24} color={COLORS.textSecondary} />
@@ -125,21 +133,49 @@ const ProductListScreen: React.FC = () => {
                 </View>
 
                 <View style={styles.detailGrid}>
-                  <DetailRow label="Product ID" value={`#${selectedProduct.id}`} />
-                  <DetailRow label="Category" value={selectedProduct.category} />
+                  <DetailRow label="รหัสสินค้า" value={`#${selectedProduct.id}`} />
+                  <DetailRow label="หมวดหมู่" value={selectedProduct.category} />
                   <DetailRow
-                    label="Quantity"
+                    label="จำนวน"
                     value={`${selectedProduct.quantity} ${selectedProduct.unit}`}
                   />
-                  <DetailRow label="Barcode" value={selectedProduct.barcode} />
                   <DetailRow
-                    label="Created"
+                    label="ราคา"
+                    value={formatCurrency(selectedProduct.price)}
+                  />
+                  <DetailRow
+                    label="สต็อกขั้นต่ำ"
+                    value={`${selectedProduct.minStock} ${selectedProduct.unit}`}
+                  />
+                  {selectedProduct.expiryDate && (
+                    <DetailRow
+                      label="หมดอายุ"
+                      value={getExpiryLabel(selectedProduct.expiryDate) ?? selectedProduct.expiryDate}
+                    />
+                  )}
+                  <DetailRow label="บาร์โค้ด" value={selectedProduct.barcode} />
+                  <DetailRow
+                    label="เพิ่มเมื่อ"
                     value={formatDateShort(selectedProduct.createdAt)}
                   />
                 </View>
 
                 <CustomButton
-                  title="Edit Product"
+                  title={LABELS.printBarcode}
+                  onPress={() => setShowBarcodeLabel(true)}
+                  variant="outline"
+                  style={styles.modalButton}
+                />
+
+                <CustomButton
+                  title="แก้ไขรูปสินค้า"
+                  onPress={() => setShowImageEditor(true)}
+                  variant="outline"
+                  style={styles.modalButton}
+                />
+
+                <CustomButton
+                  title={LABELS.editProduct}
                   onPress={() => {
                     setShowDetails(false);
                     navigation.navigate('EditProduct', {
@@ -153,6 +189,28 @@ const ProductListScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+
+      <ProductImageEditorModal
+        visible={showImageEditor}
+        product={selectedProduct}
+        onClose={() => setShowImageEditor(false)}
+        onSaved={(product) => setSelectedProduct(product)}
+      />
+
+      <BarcodeLabelModal
+        visible={showBarcodeLabel}
+        label={
+          selectedProduct
+            ? {
+                productName: selectedProduct.productName,
+                barcode: selectedProduct.barcode,
+                price: selectedProduct.price,
+                unit: selectedProduct.unit,
+              }
+            : null
+        }
+        onClose={() => setShowBarcodeLabel(false)}
+      />
     </View>
   );
 };
@@ -228,8 +286,8 @@ const styles = StyleSheet.create({
   },
   modalHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 12,
     marginBottom: 20,
   },
   modalTitle: {

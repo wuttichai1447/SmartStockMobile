@@ -1,17 +1,20 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useLayoutEffect } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useProducts } from '../context/ProductContext';
-import { COLORS } from '../utils/constants';
-import { formatDate } from '../utils/helpers';
+import { Product } from '../models/Product';
+import { COLORS, LABELS } from '../utils/constants';
+import { formatCurrency, formatDate, formatPriceWithUnit } from '../utils/helpers';
+import { showConfirm } from '../utils/alert';
 
 interface StatCardProps {
   title: string;
@@ -30,14 +33,60 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon, color }) => (
   </View>
 );
 
+const AlertProductRow: React.FC<{
+  product: Product;
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+  subtitle: string;
+}> = ({ product, icon, color, subtitle }) => (
+  <View style={styles.alertItem}>
+    <View style={[styles.alertIcon, { backgroundColor: color + '15' }]}>
+      <Ionicons name={icon} size={18} color={color} />
+    </View>
+    <View style={styles.alertContent}>
+      <Text style={styles.alertTitle}>{product.productName}</Text>
+      <Text style={styles.alertMeta}>
+        {subtitle} • {product.quantity} {product.unit}
+      </Text>
+    </View>
+    <Text style={styles.alertPrice}>
+      {formatPriceWithUnit(product.price, product.unit)}
+    </Text>
+  </View>
+);
+
 const DashboardScreen: React.FC = () => {
+  const navigation = useNavigation();
   const {
     dashboardStats,
     recentActivities,
+    lowStockProducts,
+    expiringProducts,
     refreshData,
+    logout,
     isLoading,
   } = useProducts();
   const [refreshing, setRefreshing] = React.useState(false);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() =>
+            showConfirm(
+              LABELS.logout,
+              'ต้องการออกจากระบบใช่หรือไม่?',
+              logout,
+              { confirmText: LABELS.logout, destructive: true }
+            )
+          }
+          style={styles.logoutButton}
+        >
+          <Ionicons name="log-out-outline" size={22} color={COLORS.textLight} />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, logout]);
 
   useFocusEffect(
     useCallback(() => {
@@ -65,34 +114,102 @@ const DashboardScreen: React.FC = () => {
       }
     >
       <View style={styles.header}>
-        <Text style={styles.greeting}>Dashboard</Text>
-        <Text style={styles.headerSubtitle}>Warehouse overview at a glance</Text>
+        <Text style={styles.greeting}>{LABELS.dashboard}</Text>
+        <Text style={styles.headerSubtitle}>
+          {LABELS.marketName} — ภาพรวมสต็อกวันนี้
+        </Text>
       </View>
 
       <View style={styles.statsGrid}>
         <StatCard
-          title="Total Products"
+          title="สินค้าทั้งหมด"
           value={dashboardStats.totalProducts}
           icon="cube-outline"
           color={COLORS.primary}
         />
         <StatCard
-          title="Total Stock In"
+          title="รับเข้ารวม"
           value={dashboardStats.totalStockIn}
           icon="arrow-down-circle-outline"
           color={COLORS.stockIn}
         />
         <StatCard
-          title="Total Stock Out"
+          title="จ่ายออกรวม"
           value={dashboardStats.totalStockOut}
           icon="arrow-up-circle-outline"
           color={COLORS.stockOut}
         />
+        <StatCard
+          title="ยอดขายวันนี้"
+          value={formatCurrency(dashboardStats.todaySalesTotal)}
+          icon="cart-outline"
+          color={COLORS.accent}
+        />
+        <StatCard
+          title="บิลวันนี้"
+          value={dashboardStats.todaySalesCount}
+          icon="receipt-outline"
+          color={COLORS.secondaryDark}
+        />
+        <StatCard
+          title="มูลค่าสต็อก"
+          value={formatCurrency(dashboardStats.inventoryValue)}
+          icon="cash-outline"
+          color={COLORS.secondary}
+        />
+        <StatCard
+          title="สต็อกต่ำ"
+          value={dashboardStats.lowStockCount}
+          icon="warning-outline"
+          color={COLORS.warning}
+        />
+        <StatCard
+          title="ใกล้หมดอายุ"
+          value={dashboardStats.expiringSoonCount}
+          icon="timer-outline"
+          color={COLORS.expiry}
+        />
       </View>
 
-      <View style={styles.section}>
+      {lowStockProducts.length > 0 && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>แจ้งเตือนสต็อกต่ำ</Text>
+            <Ionicons name="warning-outline" size={20} color={COLORS.warning} />
+          </View>
+          {lowStockProducts.map((product) => (
+            <AlertProductRow
+              key={product.id}
+              product={product}
+              icon="alert-circle-outline"
+              color={COLORS.warning}
+              subtitle={`ต่ำกว่า ${product.minStock} ${product.unit}`}
+            />
+          ))}
+        </View>
+      )}
+
+      {expiringProducts.length > 0 && (
+        <View style={[styles.section, styles.sectionSpaced]}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>ใกล้หมดอายุ (3 วัน)</Text>
+            <Ionicons name="timer-outline" size={20} color={COLORS.expiry} />
+          </View>
+          {expiringProducts.map((product) => (
+            <AlertProductRow
+              key={product.id}
+              product={product}
+              icon="calendar-outline"
+              color={COLORS.expiry}
+              subtitle={`หมดอายุ ${product.expiryDate}`}
+            />
+          ))}
+        </View>
+      )}
+
+      <View style={[styles.section, styles.sectionSpaced]}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Recent Activities</Text>
+          <Text style={styles.sectionTitle}>กิจกรรมล่าสุด</Text>
           <Ionicons name="time-outline" size={20} color={COLORS.textSecondary} />
         </View>
 
@@ -101,7 +218,7 @@ const DashboardScreen: React.FC = () => {
         ) : recentActivities.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="document-text-outline" size={40} color={COLORS.border} />
-            <Text style={styles.emptyText}>No recent activities</Text>
+            <Text style={styles.emptyText}>ยังไม่มีกิจกรรม</Text>
           </View>
         ) : (
           recentActivities.map((activity) => (
@@ -126,8 +243,8 @@ const DashboardScreen: React.FC = () => {
               <View style={styles.activityContent}>
                 <Text style={styles.activityTitle}>{activity.productName}</Text>
                 <Text style={styles.activityMeta}>
-                  {activity.type === 'IN' ? 'Stock In' : 'Stock Out'} • {activity.quantity}{' '}
-                  units
+                  {activity.type === 'IN' ? LABELS.stockIn : LABELS.stockOut} •{' '}
+                  {activity.quantity} หน่วย
                 </Text>
               </View>
               <Text style={styles.activityDate}>{formatDate(activity.createdAt)}</Text>
@@ -147,6 +264,10 @@ const styles = StyleSheet.create({
   content: {
     padding: 20,
     paddingBottom: 32,
+  },
+  logoutButton: {
+    marginRight: 12,
+    padding: 4,
   },
   header: {
     marginBottom: 24,
@@ -189,7 +310,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   statValue: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: '800',
     color: COLORS.text,
     marginBottom: 4,
@@ -209,6 +330,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 4,
   },
+  sectionSpaced: {
+    marginTop: 16,
+  },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -219,6 +343,39 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: COLORS.text,
+  },
+  alertItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  alertIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  alertContent: {
+    flex: 1,
+  },
+  alertTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  alertMeta: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  alertPrice: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.primary,
   },
   loader: {
     paddingVertical: 24,

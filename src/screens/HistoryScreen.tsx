@@ -2,19 +2,22 @@ import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import DatePickerField from '../components/DatePickerField';
 import { useProducts } from '../context/ProductContext';
 import { Transaction } from '../models/Product';
-import { COLORS } from '../utils/constants';
+import { COLORS, LABELS } from '../utils/constants';
+import { exportTransactionsToCsv } from '../utils/exportCsv';
 import { formatDate } from '../utils/helpers';
+import { showAlert } from '../utils/alert';
 
 const HistoryScreen: React.FC = () => {
   const { products, transactions, filterTransactions, isLoading } = useProducts();
@@ -43,6 +46,18 @@ const HistoryScreen: React.FC = () => {
     setFilteredTransactions(result);
   };
 
+  const handleExport = () => {
+    try {
+      exportTransactionsToCsv(displayTransactions);
+      showAlert('สำเร็จ', 'ส่งออกไฟล์ CSV แล้ว');
+    } catch (err) {
+      showAlert(
+        'ไม่สามารถส่งออกได้',
+        err instanceof Error ? err.message : 'เกิดข้อผิดพลาด'
+      );
+    }
+  };
+
   const displayTransactions =
     filteredTransactions.length > 0 || selectedProductId || filterDate
       ? filteredTransactions
@@ -51,25 +66,27 @@ const HistoryScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <View style={styles.filterSection}>
-        <Text style={styles.filterTitle}>Filters</Text>
+        <View style={styles.filterHeader}>
+          <Text style={styles.filterTitle}>ตัวกรอง</Text>
+          {Platform.OS === 'web' && (
+            <TouchableOpacity style={styles.exportButton} onPress={handleExport}>
+              <Ionicons name="download-outline" size={18} color={COLORS.primary} />
+              <Text style={styles.exportText}>{LABELS.exportCsv}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
-        <Text style={styles.filterLabel}>Filter by Date (YYYY-MM-DD)</Text>
-        <TextInput
-          style={styles.dateInput}
-          value={filterDate}
-          onChangeText={setFilterDate}
-          placeholder="e.g. 2026-06-21"
-          placeholderTextColor={COLORS.textSecondary}
-        />
+        <Text style={styles.filterLabel}>กรองตามวันที่</Text>
+        <DatePickerField value={filterDate} onChange={setFilterDate} />
 
-        <Text style={styles.filterLabel}>Filter by Product</Text>
+        <Text style={styles.filterLabel}>กรองตามสินค้า</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.productFilterRow}
         >
           <FilterChip
-            label="All Products"
+            label="สินค้าทั้งหมด"
             selected={selectedProductId === null}
             onPress={() => setSelectedProductId(null)}
           />
@@ -86,10 +103,10 @@ const HistoryScreen: React.FC = () => {
         <View style={styles.filterActions}>
           <TouchableOpacity style={styles.applyButton} onPress={applyFilters}>
             <Ionicons name="filter" size={18} color={COLORS.textLight} />
-            <Text style={styles.applyText}>Apply Filters</Text>
+            <Text style={styles.applyText}>ใช้ตัวกรอง</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.clearButton} onPress={clearFilters}>
-            <Text style={styles.clearText}>Clear</Text>
+            <Text style={styles.clearText}>ล้าง</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -107,9 +124,9 @@ const HistoryScreen: React.FC = () => {
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <Ionicons name="time-outline" size={48} color={COLORS.border} />
-              <Text style={styles.emptyTitle}>No transactions found</Text>
+              <Text style={styles.emptyTitle}>ไม่พบประวัติ</Text>
               <Text style={styles.emptySubtitle}>
-                Stock movements will appear here
+                การรับเข้า/จ่ายออกจะแสดงที่นี่
               </Text>
             </View>
           }
@@ -156,8 +173,8 @@ const TransactionItem: React.FC<{ transaction: Transaction }> = ({ transaction }
     <View style={styles.transactionContent}>
       <Text style={styles.transactionTitle}>{transaction.productName}</Text>
       <Text style={styles.transactionMeta}>
-        {transaction.type === 'IN' ? 'Stock In' : 'Stock Out'} • {transaction.quantity}{' '}
-        units
+        {transaction.type === 'IN' ? LABELS.stockIn : LABELS.stockOut} • {transaction.quantity}{' '}
+        หน่วย
       </Text>
       <Text style={styles.transactionDate}>{formatDate(transaction.createdAt)}</Text>
     </View>
@@ -175,11 +192,30 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
+  filterHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   filterTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: COLORS.text,
-    marginBottom: 12,
+  },
+  exportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: COLORS.primary + '10',
+  },
+  exportText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.primary,
   },
   filterLabel: {
     fontSize: 13,
